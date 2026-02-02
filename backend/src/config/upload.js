@@ -54,14 +54,14 @@ if (IS_VERCEL || IS_READ_ONLY) {
     
     cb(null, destPath);
   },
-  filename: (req, file, cb) => {
-    // Generate unique filename: timestamp-random-originalname
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    const baseName = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9]/g, '_');
-    cb(null, `${uniqueSuffix}-${baseName}${ext}`);
-  }
-});
+    filename: (req, file, cb) => {
+      // Generate unique filename: timestamp-random-originalname
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const ext = path.extname(file.originalname);
+      const baseName = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9]/g, '_');
+      cb(null, `${uniqueSuffix}-${baseName}${ext}`);
+    }
+  });
 
 // File filter - allow images, videos, PDFs, documents
 const fileFilter = (req, file, cb) => {
