@@ -1,0 +1,53 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run End-to-End Tests",
+			"type": "shell",
+			"command": "npm run test:e2e",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Run End-to-End Tests",
+			"type": "shell",
+			"command": "npm run test:e2e",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Run Frontend and Backend Servers",
+			"type": "shell",
+			"command": "npm start",
+			"args": [],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Test Backend Complaint Creation",
+			"type": "shell",
+			"command": "curl -X POST http://localhost:4000/complaints -H \"Content-Type: application/json\" -d \"{\\\"problem\\\":\\\"Test Problem\\\",\\\"isNewCustomer\\\":true,\\\"customerData\\\":{\\\"companyName\\\":\\\"Test Company\\\"},\\\"isNewMachine\\\":true,\\\"machineData\\\":{\\\"model\\\":\\\"Test Model\\\",\\\"serialNumber\\\":\\\"12345\\\"}}\"",
+			"args": [],
+			"isBackground": false
+		},
+		{
+			"label": "Test Backend Complaint Creation",
+			"type": "shell",
+			"command": "Invoke-RestMethod -Uri http://localhost:4000/complaints -Method POST -ContentType \"application/json\" -Body \"{\\\"problem\\\":\\\"Test Problem\\\",\\\"isNewCustomer\\\":true,\\\"customerData\\\":{\\\"companyName\\\":\\\"Test Company\\\"},\\\"isNewMachine\\\":true,\\\"machineData\\\":{\\\"model\\\":\\\"Test Model\\\",\\\"serialNumber\\\":\\\"12345\\\"}}\"",
+			"args": [],
+			"isBackground": false
+		},
+		{
+			"label": "Test Backend Complaint Creation",
+			"type": "shell",
+			"command": "curl.exe -X POST http://localhost:4000/complaints -H \"Content-Type: application/json\" -d \"{\\\"problem\\\":\\\"Test Problem\\\",\\\"isNewCustomer\\\":true,\\\"customerData\\\":{\\\"companyName\\\":\\\"Test Company\\\"},\\\"isNewMachine\\\":true,\\\"machineData\\\":{\\\"model\\\":\\\"Test Model\\\",\\\"serialNumber\\\":\\\"12345\\\"}}\"",
+			"args": [],
+			"isBackground": false
+		}
+	]
+}
