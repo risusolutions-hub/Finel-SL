@@ -158,15 +158,18 @@ app.get('/api/system/diagnostics', (req, res) => res.json({
 // Export app immediately for Vercel/serverless
 module.exports = app;
 
-async function start(){
+// Track initialization state
+let initialized = false;
+
+async function initializeApp(){
+  if (initialized) return;
+  
   try{
     console.log('Connecting to MongoDB for sessions...');
     await connectMongo();
     console.log('Session store ready');
 
-
     // Require model files after connection (for mongoose registration)
-
     require('./src/models_mongo/User');
     require('./src/models_mongo/DailyWorkTime');
     const Settings = require('./src/models_mongo/Settings');
@@ -236,37 +239,49 @@ async function start(){
       });
     });
 
-    // Only listen if not on Vercel (Vercel will invoke the app handler)
-    if (!process.env.VERCEL) {
-      global.server = app.listen(PORT, () => {
-        console.log(`✅ Server listening on port ${PORT}`);
-        console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
-        console.log(`🕐 Started at: ${new Date().toISOString()}`);
-      });
-
-      // Handle server errors
-      global.server.on('error', (err) => {
-        if (err.code === 'EADDRINUSE') {
-          console.error(`❌ Port ${PORT} is already in use`);
-          process.exit(1);
-        } else {
-          console.error('❌ Server error:', err);
-          process.exit(1);
-        }
-      });
-
-      // Handle server timeout
-      global.server.setTimeout(300000); // 5 minutes
-    }
+    initialized = true;
+    console.log('✅ App initialized successfully');
 
   } catch(err) {
-    console.error('❌ Failed to start:', err && (err.stack || err.message || err));
-    console.error('Stack:', err?.stack);
-    process.exit(1);
+    console.error('❌ Failed to initialize:', err && (err.stack || err.message || err));
+    throw err;
   }
 }
 
-// Only call start() if not on Vercel
+// For Vercel: middleware to initialize on first request
+if (process.env.VERCEL) {
+  app.use(async (req, res, next) => {
+    try {
+      await initializeApp();
+      next();
+    } catch (err) {
+      res.status(500).json({ error: 'Server initialization failed', message: err.message });
+    }
+  });
+}
+
+// For local development: start server
 if (!process.env.VERCEL) {
-  start();
+  initializeApp().then(() => {
+    global.server = app.listen(PORT, () => {
+      console.log(`✅ Server listening on port ${PORT}`);
+      console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🕐 Started at: ${new Date().toISOString()}`);
+    });
+
+    global.server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${PORT} is already in use`);
+        process.exit(1);
+      } else {
+        console.error('❌ Server error:', err);
+        process.exit(1);
+      }
+    });
+
+    global.server.setTimeout(300000);
+  }).catch(err => {
+    console.error('❌ Failed to start:', err);
+    process.exit(1);
+  });
 }
