@@ -41,7 +41,7 @@ console.log = function (...args) {
 console.error = (...args) => console.log(...args);
 
 
-app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
+app.use(cors({ origin: ['http://localhost:3000','http://sp.vruti.in','https://sparkel.vruti.in'], credentials: true }));
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
