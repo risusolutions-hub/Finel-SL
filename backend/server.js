@@ -185,7 +185,6 @@ async function start(){
     const complaintRoutes = require('./src/routes/complaints');
     const leaveRoutes = require('./src/routes/leaves');
     const workTimeRoutes = require('./src/routes/workTime');
-    const uploadRoutes = require('./src/routes/uploads');
     const skillRoutes = require('./src/routes/skills');
     const serviceHistoryRoutes = require('./src/routes/serviceHistory');
     const checklistRoutes = require('./src/routes/checklists');
@@ -212,7 +211,6 @@ async function start(){
     app.use('/api/complaints', complaintRoutes);
     app.use('/api/leaves', leaveRoutes);
     app.use('/api/worktime', workTimeRoutes);
-    app.use('/api/uploads', uploadRoutes);
     app.use('/api/skills', skillRoutes);
     app.use('/api/service-history', serviceHistoryRoutes);
     app.use('/api/checklists', checklistRoutes);
