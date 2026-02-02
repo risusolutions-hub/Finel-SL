@@ -41,15 +41,13 @@ console.log = function (...args) {
 console.error = (...args) => console.log(...args);
 
 
-app.use(
-  cors({
-    origin: [
-      "http://localhost:3000",      // local frontend
-      "https://service-backend-omega.vercel.app/" // production frontend
-    ],
-    credentials: true
-  })
-);
+app.use(cors({
+  origin: [
+    'https://service-backend-omega.vercel.app', // production frontend
+    'http://localhost:3000'                     // local dev
+  ],
+  credentials: true
+}));
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
@@ -80,13 +78,13 @@ const store = MongoStore.create({
 });
 app.use(session({
   secret: process.env.SESSION_SECRET || 'keyboard cat',
-  store,
+  store,                  // your existing MongoStore
   resave: false,
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    secure: true,       // REQUIRED on Render (HTTPS)
-    sameSite: 'none',   // REQUIRED for cross-domain cookies
+    secure: true,        // HTTPS required on Render
+    sameSite: 'none',    // MUST for cross-domain cookies
     maxAge: 1000 * 60 * 60 * 24
   }
 }));
