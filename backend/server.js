@@ -155,6 +155,9 @@ app.get('/api/system/diagnostics', (req, res) => res.json({
   node_version: process.version
 }));
 
+// Export app immediately for Vercel/serverless
+module.exports = app;
+
 async function start(){
   try{
     console.log('Connecting to MongoDB for sessions...');
@@ -233,26 +236,28 @@ async function start(){
       });
     });
 
-    // Start server with proper error handling
-    global.server = app.listen(PORT, () => {
-      console.log(`✅ Server listening on port ${PORT}`);
-      console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🕐 Started at: ${new Date().toISOString()}`);
-    });
+    // Only listen if not on Vercel (Vercel will invoke the app handler)
+    if (!process.env.VERCEL) {
+      global.server = app.listen(PORT, () => {
+        console.log(`✅ Server listening on port ${PORT}`);
+        console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`🕐 Started at: ${new Date().toISOString()}`);
+      });
 
-    // Handle server errors
-    global.server.on('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        console.error(`❌ Port ${PORT} is already in use`);
-        process.exit(1);
-      } else {
-        console.error('❌ Server error:', err);
-        process.exit(1);
-      }
-    });
+      // Handle server errors
+      global.server.on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+          console.error(`❌ Port ${PORT} is already in use`);
+          process.exit(1);
+        } else {
+          console.error('❌ Server error:', err);
+          process.exit(1);
+        }
+      });
 
-    // Handle server timeout
-    global.server.setTimeout(300000); // 5 minutes
+      // Handle server timeout
+      global.server.setTimeout(300000); // 5 minutes
+    }
 
   } catch(err) {
     console.error('❌ Failed to start:', err && (err.stack || err.message || err));
@@ -261,10 +266,7 @@ async function start(){
   }
 }
 
-start();
-
-// Export app for Vercel/serverless environments
-module.exports = app;
-
-// Only start listening on non-Vercel environments
-// (Vercel will call the exported app function)
+// Only call start() if not on Vercel
+if (!process.env.VERCEL) {
+  start();
+}
