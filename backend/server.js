@@ -264,3 +264,9 @@ async function start(){
 }
 
 start();
+
+// Export app for Vercel/serverless environments
+module.exports = app;
+
+// Only start listening on non-Vercel environments
+// (Vercel will call the exported app function)
