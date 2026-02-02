@@ -1,40 +1,12 @@
 require('dotenv').config();
 
-// Global error handlers - MUST be first
+// Global error handlers
 process.on('uncaughtException', (err) => {
-  console.error('❌ UNCAUGHT EXCEPTION:', err);
+  console.error('Uncaught Exception:', err);
 });
-
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ UNHANDLED REJECTION:', reason && (reason.stack || reason.message || reason));
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason && (reason.stack || reason.message || reason));
 });
-
-// Graceful shutdown for traditional servers (NOT for Vercel/Serverless)
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-  process.on('SIGTERM', () => {
-    console.log('⚠️  SIGTERM received');
-    if (global.server) {
-      global.server.close(() => {
-        console.log('Server closed');
-        process.exit(0);
-      });
-    } else {
-      process.exit(0);
-    }
-  });
-
-  process.on('SIGINT', () => {
-    console.log('⚠️  SIGINT received');
-    if (global.server) {
-      global.server.close(() => {
-        console.log('Server closed');
-        process.exit(0);
-      });
-    } else {
-      process.exit(0);
-    }
-  });
-}
 
 const express = require('express');
 const cors = require('cors');
@@ -45,28 +17,39 @@ const MongoStore = require('connect-mongo');
 const { connectMongo } = require('./src/config/mongo');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
-const IS_VERCEL = !!process.env.VERCEL;
+// Toggle request logging (set ENABLE_REQUEST_LOGS=true to enable)
 const ENABLE_REQUEST_LOGS = String(process.env.ENABLE_REQUEST_LOGS || 'false').toLowerCase() === 'true';
 
-// Simple console logging (no file writes for Vercel)
-const originalLog = console.log;
-const originalError = console.error;
-
+// Redirect console.log and console.error to server.log
+const logStream = fs.createWriteStream(path.join(__dirname, 'server.log'), { flags: 'a' });
 console.log = function (...args) {
-  const msg = args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
-  originalLog(`[${new Date().toISOString()}]`, msg);
+  try {
+    const msg = args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
+    const line = `${new Date().toISOString()} - ${msg}\n`;
+    logStream.write(line);
+    process.stdout.write(`${msg}\n`);
+  } catch (e) {
+    const fallback = `${new Date().toISOString()} - [LOG ERROR]`;
+    logStream.write(fallback + '\n');
+    process.stdout.write('[LOG ERROR]\n');
+  }
 };
-
-console.error = function (...args) {
-  const msg = args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
-  originalError(`[${new Date().toISOString()}]`, msg);
-};
+console.error = (...args) => console.log(...args);
 
 
-app.use(cors({ origin: ['http://localhost:3000','http://sp.vruti.in','https://sparkel.vruti.in'], credentials: true }));
+app.use(
+  cors({
+    origin: [
+      "http://localhost:3000",      // local frontend
+      "https://service-backend-omega.vercel.app/" // production frontend
+    ],
+    credentials: true
+  })
+);
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
@@ -102,11 +85,12 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 1000 * 60 * 60 * 24, // 1 day
-    sameSite: 'lax'
+    secure: true,       // REQUIRED on Render (HTTPS)
+    sameSite: 'none',   // REQUIRED for cross-domain cookies
+    maxAge: 1000 * 60 * 60 * 24
   }
 }));
+
 
 // API logging middleware (before routes)
 // app.use('/api', apiLogger);
@@ -129,48 +113,78 @@ app.use(session({
 // app.use('/api/settings', settingsRoutes);
 // app.use('/api/system', systemRoutes);
 
-// Health check endpoint
-app.get('/health', (req, res) => res.json({ 
-  ok: true, 
-  timestamp: new Date().toISOString(),
-  uptime: process.uptime(),
-  environment: process.env.NODE_ENV,
-  port: PORT
-}));
+// app.get('/', (req, res) => res.json({ ok: true }));
 
-// Ready check endpoint (for Kubernetes/Docker)
-app.get('/ready', (req, res) => res.json({ 
-  ready: true, 
-  timestamp: new Date().toISOString(),
-  mongodb: 'connected'
-}));
-
-// Diagnostics endpoint
-app.get('/api/system/diagnostics', (req, res) => res.json({
-  memory: process.memoryUsage(),
-  uptime: process.uptime(),
-  timestamp: new Date().toISOString(),
-  environment: process.env.NODE_ENV,
-  port: PORT,
-  node_version: process.version
-}));
-
-// Export app immediately for Vercel/serverless
-// Version: 2026-02-02 v2
-module.exports = app;
-
-// Track initialization state
-let initialized = false;
-
-async function initializeApp(){
-  if (initialized) return;
+// Auto-checkout scheduler - runs every minute to check for 7pm auto-checkout
+async function autoCheckoutAllEngineers() {
+  const now = new Date();
+  const hour = now.getHours();
+  const minute = now.getMinutes();
   
+  // Run at 7:00 PM (19:00)
+  if (hour === 19 && minute === 0) {
+    console.log('[Auto-Checkout] Running 7:00 PM auto-checkout...');
+    try {
+      // Find all users who are still checked in (Mongoose)
+      const checkedInUsers = await User.find({ isCheckedIn: true }).exec();
+
+      for (const user of checkedInUsers) {
+        const checkoutTime = new Date(now);
+        checkoutTime.setHours(19, 0, 0, 0);
+
+        const checkInTime = user.lastCheckIn ? new Date(user.lastCheckIn) : checkoutTime;
+        const duration = Math.floor((checkoutTime - checkInTime) / 60000);
+
+        user.lastCheckOut = checkoutTime;
+        user.isCheckedIn = false;
+        user.dailyLastCheckOut = checkoutTime;
+        user.dailyTotalWorkTime = (user.dailyTotalWorkTime || 0) + duration;
+        user.activeTime = (user.activeTime || 0) + duration;
+
+        await user.save();
+
+        // Save or update daily work time record (Mongoose)
+        const today = now.toISOString().split('T')[0];
+        let record = await DailyWorkTime.findOne({ engineerId: user._id || user.id, workDate: today }).exec();
+        if (!record) {
+          record = new DailyWorkTime({
+            engineerId: user._id || user.id,
+            workDate: today,
+            firstCheckIn: user.dailyFirstCheckIn,
+            lastCheckOut: user.dailyLastCheckOut,
+            totalWorkTimeMinutes: user.dailyTotalWorkTime,
+            checkInCheckOutLog: []
+          });
+        } else {
+          record.lastCheckOut = user.dailyLastCheckOut;
+          record.totalWorkTimeMinutes = user.dailyTotalWorkTime;
+        }
+        await record.save();
+
+        console.log(`[Auto-Checkout] User ${user.name} (ID: ${user._id || user.id}) auto-checked out. Worked: ${duration} minutes`);
+      }
+
+      if (checkedInUsers.length > 0) {
+        console.log(`[Auto-Checkout] Completed. ${checkedInUsers.length} users auto-checked out.`);
+      }
+    } catch (err) {
+      console.error('[Auto-Checkout] Error:', err);
+    }
+  }
+}
+
+// Schedule auto-checkout check every minute
+setInterval(autoCheckoutAllEngineers, 60 * 1000);
+
+async function start(){
   try{
     console.log('Connecting to MongoDB for sessions...');
     await connectMongo();
     console.log('Session store ready');
 
+
     // Require model files after connection (for mongoose registration)
+
     require('./src/models_mongo/User');
     require('./src/models_mongo/DailyWorkTime');
     const Settings = require('./src/models_mongo/Settings');
@@ -192,6 +206,7 @@ async function initializeApp(){
     const complaintRoutes = require('./src/routes/complaints');
     const leaveRoutes = require('./src/routes/leaves');
     const workTimeRoutes = require('./src/routes/workTime');
+    const uploadRoutes = require('./src/routes/uploads');
     const skillRoutes = require('./src/routes/skills');
     const serviceHistoryRoutes = require('./src/routes/serviceHistory');
     const checklistRoutes = require('./src/routes/checklists');
@@ -218,6 +233,7 @@ async function initializeApp(){
     app.use('/api/complaints', complaintRoutes);
     app.use('/api/leaves', leaveRoutes);
     app.use('/api/worktime', workTimeRoutes);
+    app.use('/api/uploads', uploadRoutes);
     app.use('/api/skills', skillRoutes);
     app.use('/api/service-history', serviceHistoryRoutes);
     app.use('/api/checklists', checklistRoutes);
@@ -226,63 +242,11 @@ async function initializeApp(){
     app.use('/api/settings', settingsRoutes);
     app.use('/api/system', systemRoutes);
 
-    // 404 handler
-    app.use((req, res) => {
-      res.status(404).json({ error: 'Route not found', path: req.path });
-    });
-
-    // Global error handler
-    app.use((err, req, res, next) => {
-      console.error('Error:', err);
-      res.status(err.status || 500).json({
-        error: err.message || 'Internal Server Error',
-        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-      });
-    });
-
-    initialized = true;
-    console.log('✅ App initialized successfully');
-
-  } catch(err) {
-    console.error('❌ Failed to initialize:', err && (err.stack || err.message || err));
-    throw err;
+    app.listen(PORT, ()=> console.log(`Server listening on ${PORT}`));
+  }catch(err){
+    console.error('Failed to start:', err && (err.stack || err.message || err));
+    process.exit(1);
   }
 }
 
-// For Vercel: middleware to initialize on first request
-if (process.env.VERCEL) {
-  app.use(async (req, res, next) => {
-    try {
-      await initializeApp();
-      next();
-    } catch (err) {
-      res.status(500).json({ error: 'Server initialization failed', message: err.message });
-    }
-  });
-}
-
-// For local development: start server
-if (!process.env.VERCEL) {
-  initializeApp().then(() => {
-    global.server = app.listen(PORT, () => {
-      console.log(`✅ Server listening on port ${PORT}`);
-      console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🕐 Started at: ${new Date().toISOString()}`);
-    });
-
-    global.server.on('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        console.error(`❌ Port ${PORT} is already in use`);
-        process.exit(1);
-      } else {
-        console.error('❌ Server error:', err);
-        process.exit(1);
-      }
-    });
-
-    global.server.setTimeout(300000);
-  }).catch(err => {
-    console.error('❌ Failed to start:', err);
-    process.exit(1);
-  });
-}
+start();
