@@ -156,6 +156,7 @@ app.get('/api/system/diagnostics', (req, res) => res.json({
 }));
 
 // Export app immediately for Vercel/serverless
+// Version: 2026-02-02 v2
 module.exports = app;
 
 // Track initialization state
