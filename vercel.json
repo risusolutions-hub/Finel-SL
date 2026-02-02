@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd backend && npm install",
+  "buildCommand": "npm install",
   "functions": {
     "backend/api/index.js": {
       "memory": 1024,
