@@ -1,11 +1,41 @@
 require('dotenv').config();
 
-// Global error handlers
+// Global error handlers - MUST be first
 process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
+  console.error('❌ UNCAUGHT EXCEPTION:', err);
+  console.error(err.stack);
+  process.exit(1);
 });
+
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason && (reason.stack || reason.message || reason));
+  console.error('❌ UNHANDLED REJECTION at:', promise);
+  console.error('Reason:', reason && (reason.stack || reason.message || reason));
+  process.exit(1);
+});
+
+// Handle SIGTERM for graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('⚠️  SIGTERM signal received: closing HTTP server');
+  if (global.server) {
+    global.server.close(() => {
+      console.log('HTTP server closed');
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
+});
+
+process.on('SIGINT', () => {
+  console.log('⚠️  SIGINT signal received: closing HTTP server');
+  if (global.server) {
+    global.server.close(() => {
+      console.log('HTTP server closed');
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
 });
 
 const express = require('express');
@@ -104,68 +134,31 @@ app.use(session({
 // app.use('/api/settings', settingsRoutes);
 // app.use('/api/system', systemRoutes);
 
-// app.get('/', (req, res) => res.json({ ok: true }));
+// Health check endpoint
+app.get('/health', (req, res) => res.json({ 
+  ok: true, 
+  timestamp: new Date().toISOString(),
+  uptime: process.uptime(),
+  environment: process.env.NODE_ENV,
+  port: PORT
+}));
 
-// Auto-checkout scheduler - runs every minute to check for 7pm auto-checkout
-async function autoCheckoutAllEngineers() {
-  const now = new Date();
-  const hour = now.getHours();
-  const minute = now.getMinutes();
-  
-  // Run at 7:00 PM (19:00)
-  if (hour === 19 && minute === 0) {
-    console.log('[Auto-Checkout] Running 7:00 PM auto-checkout...');
-    try {
-      // Find all users who are still checked in (Mongoose)
-      const checkedInUsers = await User.find({ isCheckedIn: true }).exec();
+// Ready check endpoint (for Kubernetes/Docker)
+app.get('/ready', (req, res) => res.json({ 
+  ready: true, 
+  timestamp: new Date().toISOString(),
+  mongodb: 'connected'
+}));
 
-      for (const user of checkedInUsers) {
-        const checkoutTime = new Date(now);
-        checkoutTime.setHours(19, 0, 0, 0);
-
-        const checkInTime = user.lastCheckIn ? new Date(user.lastCheckIn) : checkoutTime;
-        const duration = Math.floor((checkoutTime - checkInTime) / 60000);
-
-        user.lastCheckOut = checkoutTime;
-        user.isCheckedIn = false;
-        user.dailyLastCheckOut = checkoutTime;
-        user.dailyTotalWorkTime = (user.dailyTotalWorkTime || 0) + duration;
-        user.activeTime = (user.activeTime || 0) + duration;
-
-        await user.save();
-
-        // Save or update daily work time record (Mongoose)
-        const today = now.toISOString().split('T')[0];
-        let record = await DailyWorkTime.findOne({ engineerId: user._id || user.id, workDate: today }).exec();
-        if (!record) {
-          record = new DailyWorkTime({
-            engineerId: user._id || user.id,
-            workDate: today,
-            firstCheckIn: user.dailyFirstCheckIn,
-            lastCheckOut: user.dailyLastCheckOut,
-            totalWorkTimeMinutes: user.dailyTotalWorkTime,
-            checkInCheckOutLog: []
-          });
-        } else {
-          record.lastCheckOut = user.dailyLastCheckOut;
-          record.totalWorkTimeMinutes = user.dailyTotalWorkTime;
-        }
-        await record.save();
-
-        console.log(`[Auto-Checkout] User ${user.name} (ID: ${user._id || user.id}) auto-checked out. Worked: ${duration} minutes`);
-      }
-
-      if (checkedInUsers.length > 0) {
-        console.log(`[Auto-Checkout] Completed. ${checkedInUsers.length} users auto-checked out.`);
-      }
-    } catch (err) {
-      console.error('[Auto-Checkout] Error:', err);
-    }
-  }
-}
-
-// Schedule auto-checkout check every minute
-setInterval(autoCheckoutAllEngineers, 60 * 1000);
+// Diagnostics endpoint
+app.get('/api/system/diagnostics', (req, res) => res.json({
+  memory: process.memoryUsage(),
+  uptime: process.uptime(),
+  timestamp: new Date().toISOString(),
+  environment: process.env.NODE_ENV,
+  port: PORT,
+  node_version: process.version
+}));
 
 async function start(){
   try{
@@ -233,9 +226,44 @@ async function start(){
     app.use('/api/settings', settingsRoutes);
     app.use('/api/system', systemRoutes);
 
-    app.listen(PORT, ()=> console.log(`Server listening on ${PORT}`));
-  }catch(err){
-    console.error('Failed to start:', err && (err.stack || err.message || err));
+    // 404 handler
+    app.use((req, res) => {
+      res.status(404).json({ error: 'Route not found', path: req.path });
+    });
+
+    // Global error handler
+    app.use((err, req, res, next) => {
+      console.error('Error:', err);
+      res.status(err.status || 500).json({
+        error: err.message || 'Internal Server Error',
+        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+      });
+    });
+
+    // Start server with proper error handling
+    global.server = app.listen(PORT, () => {
+      console.log(`✅ Server listening on port ${PORT}`);
+      console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🕐 Started at: ${new Date().toISOString()}`);
+    });
+
+    // Handle server errors
+    global.server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${PORT} is already in use`);
+        process.exit(1);
+      } else {
+        console.error('❌ Server error:', err);
+        process.exit(1);
+      }
+    });
+
+    // Handle server timeout
+    global.server.setTimeout(300000); // 5 minutes
+
+  } catch(err) {
+    console.error('❌ Failed to start:', err && (err.stack || err.message || err));
+    console.error('Stack:', err?.stack);
     process.exit(1);
   }
 }

@@ -3341,3 +3341,30 @@
 2026-02-02T04:29:16.761Z - Default settings initialized (mongo)
 2026-02-02T04:29:16.779Z - ALLOW_PUBLIC_COMPLAINTS is not false: allowing public POST /api/complaints
 2026-02-02T04:29:16.815Z - Server listening on 4000
+2026-02-02T04:31:20.213Z - Connecting to MongoDB for sessions...
+2026-02-02T04:31:20.584Z - MongoDB connected
+2026-02-02T04:31:20.585Z - Session store ready
+2026-02-02T04:31:20.945Z - Default settings initialized (mongo)
+2026-02-02T04:31:20.958Z - ALLOW_PUBLIC_COMPLAINTS is not false: allowing public POST /api/complaints
+2026-02-02T04:31:20.979Z - Server listening on 4000
+2026-02-02T04:34:00.309Z - Connecting to MongoDB for sessions...
+2026-02-02T04:34:00.894Z - MongoDB connected
+2026-02-02T04:34:00.894Z - Session store ready
+2026-02-02T04:34:01.275Z - Default settings initialized (mongo)
+2026-02-02T04:34:01.291Z - ALLOW_PUBLIC_COMPLAINTS is not false: allowing public POST /api/complaints
+2026-02-02T04:34:01.316Z - Server listening on 4000
+2026-02-02T04:35:13.708Z - Connecting to MongoDB for sessions...
+2026-02-02T04:35:13.989Z - MongoDB connected
+2026-02-02T04:35:13.990Z - Session store ready
+2026-02-02T04:35:14.374Z - Default settings initialized (mongo)
+2026-02-02T04:35:14.386Z - ALLOW_PUBLIC_COMPLAINTS is not false: allowing public POST /api/complaints
+2026-02-02T04:35:14.408Z - Server listening on 4000
+2026-02-02T04:37:08.121Z - Connecting to MongoDB for sessions...
+2026-02-02T04:37:08.449Z - MongoDB connected
+2026-02-02T04:37:08.449Z - Session store ready
+2026-02-02T04:37:08.811Z - Default settings initialized (mongo)
+2026-02-02T04:37:08.824Z - ALLOW_PUBLIC_COMPLAINTS is not false: allowing public POST /api/complaints
+2026-02-02T04:37:08.848Z - ✅ Server listening on port 4000
+2026-02-02T04:37:08.848Z - 📡 Environment: development
+2026-02-02T04:37:08.848Z - 🕐 Started at: 2026-02-02T04:37:08.848Z
+2026-02-02T04:37:18.994Z - ⚠️  SIGINT signal received: closing HTTP server
