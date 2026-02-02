@@ -3335,3 +3335,9 @@
 2026-01-22T16:21:23.460Z - Server listening on 4000
 2026-01-22T16:23:23.401Z - [ASSIGN] Assigning complaint 6971ba999764e7eff8610cd0 to engineerId: 6971ad93e1fc6db31aa696fe as string: 6971ad93e1fc6db31aa696fe
 2026-01-22T16:23:23.409Z - [ASSIGN] Complaint assigned. Complaint.assignedTo: 6971ad93e1fc6db31aa696fe
+2026-02-02T04:29:15.966Z - Connecting to MongoDB for sessions...
+2026-02-02T04:29:16.262Z - MongoDB connected
+2026-02-02T04:29:16.262Z - Session store ready
+2026-02-02T04:29:16.761Z - Default settings initialized (mongo)
+2026-02-02T04:29:16.779Z - ALLOW_PUBLIC_COMPLAINTS is not false: allowing public POST /api/complaints
+2026-02-02T04:29:16.815Z - Server listening on 4000
