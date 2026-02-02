@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "buildCommand": "cd backend && npm install",
+  "functions": {
+    "backend/api/index.js": {
+      "memory": 1024,
+      "maxDuration": 60,
+      "runtime": "nodejs18.x"
+    }
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "backend/api/index.js",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "VERCEL": "true",
+    "UPLOAD_MODE": "memory"
+  },
+  "regions": ["iad1"],
+  "public": false
+}

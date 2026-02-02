@@ -2,22 +2,49 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Create uploads directory if it doesn't exist
-const uploadDir = path.join(__dirname, '../../uploads');
-const ticketUploadsDir = path.join(uploadDir, 'tickets');
+// Detect if running on Vercel or read-only filesystem
+const IS_VERCEL = !!process.env.VERCEL;
+const IS_READ_ONLY = process.env.NODE_ENV === 'production' && process.env.UPLOAD_STORAGE !== 'disk';
 
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-if (!fs.existsSync(ticketUploadsDir)) {
-  fs.mkdirSync(ticketUploadsDir, { recursive: true });
-}
+// Use memory storage for Vercel/serverless (or cloud storage)
+if (IS_VERCEL || IS_READ_ONLY) {
+  console.log('📦 Using memory storage for uploads (Vercel/Serverless detected)');
+  module.exports = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: parseInt(process.env.MAX_FILE_SIZE || '104857600') // 100MB default
+    }
+  });
+} else {
+  // Use disk storage for local development
+  const uploadDir = path.join(__dirname, '../../uploads');
+  const ticketUploadsDir = path.join(uploadDir, 'tickets');
 
-// Configure storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // Create folder structure: uploads/tickets/YYYY-MM/
-    const now = new Date();
+  // Create directories safely
+  try {
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    if (!fs.existsSync(ticketUploadsDir)) {
+      fs.mkdirSync(ticketUploadsDir, { recursive: true });
+    }
+  } catch (err) {
+    console.warn('⚠️  Could not create upload directories:', err.message);
+    // Fall back to memory storage
+    module.exports = multer({
+      storage: multer.memoryStorage(),
+      limits: {
+        fileSize: parseInt(process.env.MAX_FILE_SIZE || '104857600')
+      }
+    });
+    module.exports.exports = true;
+  }
+
+  // Configure disk storage
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      // Create folder structure: uploads/tickets/YYYY-MM/
+      const now = new Date();
     const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const destPath = path.join(ticketUploadsDir, yearMonth);
     

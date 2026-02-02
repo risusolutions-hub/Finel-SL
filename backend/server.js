@@ -3,40 +3,38 @@ require('dotenv').config();
 // Global error handlers - MUST be first
 process.on('uncaughtException', (err) => {
   console.error('❌ UNCAUGHT EXCEPTION:', err);
-  console.error(err.stack);
-  process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ UNHANDLED REJECTION at:', promise);
-  console.error('Reason:', reason && (reason.stack || reason.message || reason));
-  process.exit(1);
+  console.error('❌ UNHANDLED REJECTION:', reason && (reason.stack || reason.message || reason));
 });
 
-// Handle SIGTERM for graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('⚠️  SIGTERM signal received: closing HTTP server');
-  if (global.server) {
-    global.server.close(() => {
-      console.log('HTTP server closed');
+// Graceful shutdown for traditional servers (NOT for Vercel/Serverless)
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  process.on('SIGTERM', () => {
+    console.log('⚠️  SIGTERM received');
+    if (global.server) {
+      global.server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+      });
+    } else {
       process.exit(0);
-    });
-  } else {
-    process.exit(0);
-  }
-});
+    }
+  });
 
-process.on('SIGINT', () => {
-  console.log('⚠️  SIGINT signal received: closing HTTP server');
-  if (global.server) {
-    global.server.close(() => {
-      console.log('HTTP server closed');
+  process.on('SIGINT', () => {
+    console.log('⚠️  SIGINT received');
+    if (global.server) {
+      global.server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+      });
+    } else {
       process.exit(0);
-    });
-  } else {
-    process.exit(0);
-  }
-});
+    }
+  });
+}
 
 const express = require('express');
 const cors = require('cors');
@@ -47,28 +45,25 @@ const MongoStore = require('connect-mongo');
 const { connectMongo } = require('./src/config/mongo');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
-const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
-// Toggle request logging (set ENABLE_REQUEST_LOGS=true to enable)
+const IS_VERCEL = !!process.env.VERCEL;
 const ENABLE_REQUEST_LOGS = String(process.env.ENABLE_REQUEST_LOGS || 'false').toLowerCase() === 'true';
 
-// Redirect console.log and console.error to server.log
-const logStream = fs.createWriteStream(path.join(__dirname, 'server.log'), { flags: 'a' });
+// Simple console logging (no file writes for Vercel)
+const originalLog = console.log;
+const originalError = console.error;
+
 console.log = function (...args) {
-  try {
-    const msg = args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
-    const line = `${new Date().toISOString()} - ${msg}\n`;
-    logStream.write(line);
-    process.stdout.write(`${msg}\n`);
-  } catch (e) {
-    const fallback = `${new Date().toISOString()} - [LOG ERROR]`;
-    logStream.write(fallback + '\n');
-    process.stdout.write('[LOG ERROR]\n');
-  }
+  const msg = args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
+  originalLog(`[${new Date().toISOString()}]`, msg);
 };
-console.error = (...args) => console.log(...args);
+
+console.error = function (...args) {
+  const msg = args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
+  originalError(`[${new Date().toISOString()}]`, msg);
+};
 
 
 app.use(cors({ origin: ['http://localhost:3000','http://sp.vruti.in','https://sparkel.vruti.in'], credentials: true }));
